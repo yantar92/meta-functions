@@ -1,4 +1,4 @@
-  ;;; meta-functions.el --- Define meta-functions to act differently depending on major mode -*- lexical-binding: t; -*-
+;;; meta-functions.el --- Define meta-functions to act differently depending on major mode -*- lexical-binding: t; -*-
 
 ;; Version: 1.0
 ;; Author: Ihor Radchenko <yantar92@gmail.com>

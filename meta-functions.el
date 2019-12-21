@@ -1,10 +1,11 @@
+;; [[file:~/Git/emacs-config/config.org::*END][END:1]]
 ;;; meta-functions.el --- Define meta-functions to act differently depending on major mode -*- lexical-binding: t; -*-
 
-;; Version: 1.0
+;; Version: 2.0
 ;; Author: Ihor Radchenko <yantar92@gmail.com>
 ;; Created: 10 March 2018
 
-  ;;; Commentary:
+;;; Commentary:
 
 ;; Quick implementation of meta-functions, which allows to run multiple
 ;; functions, which do similar logical operations by one single "meta"
@@ -15,61 +16,205 @@
 ;; and org-agenda modes.
 ;; Example usage:
 ;; (use-package meta-functions
-;;   :init
-;;   (setq meta-funcions-list '((meta-function-1 default-function-1 "Description") (meta-function-2 default-function-2  "description")))
-;;   (setq meta-functions-meta-function-1-alist '((major-mode-1 . function-1)))
-;;   )
-;; This will define meta-function-1 and meta-function-2 to automatically
-;; choose the right real functions depending on the major mode.
+;;   :config
+;; (meta-defun meta-next-element ()
+;;   "Go to next element."
+;;   :mode org-agenda-mode (org-agenda-next-item 1) ; call org-agenda-next-item in org-agenda
+;;   :cond (lambda () (and (eq major-mode 'org-mode) (org-at-heading-p))) (org-next-visible-heading 1) ; call org-next-visible-headting when at heading in org-mode
+;;   (next-line)) ; call-next line in any other case
+;; )
+;; or the same can be written as
+;; (meta-defun meta-next-element "Go to next element." next-line)
+;; (meta-defun meta-next-element :mode org-agenda-mode (org-agenda-next-item 1))
+;; (meta-defun meta-next-element :mode org-mode :cond org-at-heading-p (org-next-visible-heading 1))
 
-  ;;; Code:
+;;; Code:
+(require 'seq)
+(require 'dash)
 
-(defvar meta-functions-list '()
-  "A list of meta function names, corresponding functions to be called by default, and their description.
-    Each function may have meta-functions-metafunctionname-alist variable containing pairs of major mode names
-    and corresponding function to be called by meta-function in that major mode.
-    The default functions will be called if the major mode is not in the alist")
+(defun meta-functions--process-args-1 (args &optional recursive)
+  "Return list of ((sub-body-symbol condition-func|mode-symbol number-elements-in-args) ...) in front of ARGS."
+  (pcase args
+    (`(:mode ,(and (pred symbolp) s) . ,_)
+     (cons
+      (list (make-symbol (concat "%" (symbol-name s)))
+	    `(quote ,s)
+            2)
+      (meta-functions--process-args-1 (cddr args) 'recursive)))
+    (`(:cond :symbol ,(and (pred symbolp) s) ,(and (pred #'functionp) func) . ,_)
+     (cons
+      (list (make-symbol (concat "%" (symbol-name s)))
+	    `(function ,func)
+            4)
+      (meta-functions--process-args-1 (cddddr args) 'recursive)))
+    (`(:cond :symbol . ,_)
+     (error ":cond :symbol must be followed by symbol and function."))
+    (`(:cond ,(and (pred functionp) func) . ,_)
+     (cons
+      (list (when (symbolp func) (make-symbol (concat "%" (symbol-name func))))
+	    `(function ,func)
+            2)
+      (meta-functions--process-args-1 (cddr args) 'recursive)))
+    (`(:cond ,form . ,_)
+     (cons
+      (list (make-symbol (concat "%lambda" (org-id-uuid)))
+	    `(function (lambda () ,form))
+	    2)
+      (meta-functions--process-args-1 (cddr args) 'recursive)))
+    (_
+     (unless recursive
+       (list (list
+	      '%t
+              `(function t)
+              0))))))
 
-(defun meta-functions-add-meta-function (&rest args)
-  "Add meta function or a list of metafunctions as in `meta-functions-list' and update the definitions."
-  (setq meta-functions-list (append meta-functions-list args))
-  (meta-functions-update-function-definitions))
+(defun meta-functions--process-args (name args)
+  "Process arguments of `meta-defun'.
+The return value is a list (arglist docstring ((sub-body-symbol condition-func|mode-symbol body) ...))."
+  (when (memq ':override-nil args) (setq args (delq ':override-nil args)))
+  (let* ((arglist (and (listp (car args)) (pop args)))
+	 (docstring (and (stringp (car args)) (pop args)))
+	 conditions)
+    (while args
+      (add-to-list 'conditions
+		   (cl-loop for (symbol subcondition num-remove) in (meta-functions--process-args-1 args)
+			    with condition = nil
+			    with sumsymbol = nil
+			    do (when symbol
+				 (if sumsymbol
+				     (setq sumsymbol
+					   (make-symbol (concat (symbol-name sumsymbol)
+								"+"
+								(symbol-name symbol))))
+				   (setq sumsymbol
+					 (make-symbol (concat (symbol-name name)
+							      (symbol-name symbol))))))
+			    do (dotimes (_ num-remove) (pop args))
+			    do (push subcondition condition)
+			    finally return (cons sumsymbol
+						 (nreverse (push (pcase (cl-loop for el = (pop args)
+										 collect el
+										 until (or (seq-empty-p args) (meta-functions--process-args-1 args 'recursive)))
+								   (`(,(and (pred functionp) func)) `(function ,func))
+								   (`(,form) `(lambda () (interactive) ,form)))
+								 condition))))
+		   'append))
+    (list arglist docstring conditions)))
 
-(defun meta-functions-update-function-definitions ()
-  "Update definitions of all the meta-functions according the present value of `meta-functions-list'."
-  (mapc (lambda (elem)
-	  (let* ((meta-func (car elem))
-		 (default-func (cadr elem))
-		 (meta-func-description (or (car (nthcdr 2 elem))
-					    ""))
-		 (func-alist (read (concat "meta-functions-" (format "%s" `,meta-func) "-alist"))))
-	    (eval `(defvar ,func-alist '()
-		     ,(concat "List of functions to be called by `"
-			      (format "%s" meta-func)
-			      "'.\nIt is an alist containing cons of major mode name and function name to be called.")))
-	    (eval `(defun ,meta-func (&optional args)
-		     ,(concat "Meta function."
-			      (if (not (seq-empty-p meta-func-description))
-				  (concat " The description is: \""
-					  meta-func-description
-					  "\"."))
-			      "\nMeta function is calling `"
-			      (format "%s" default-func)
-			      "' by default."
-			      (and (not (seq-empty-p (eval func-alist)))
-				   (concat "\nCalling other functions in various major modes (major-mode . functions):\n"
-					   (mapconcat (lambda(elem) (message "%s . `%s'" (car elem) (cdr elem))) (eval func-alist) "\n")
-					   )))
-		     (interactive)
-		     (let ((real-func
-			    (or (alist-get major-mode ,func-alist ',default-func)
-				',default-func)))
-		       (when (fboundp real-func)
-			 (call-interactively real-func nil args)))))))
-	meta-functions-list))
 
-(meta-functions-update-function-definitions)
+(defun meta-functions--generate-docstring (name default-docstring conditions)
+  "Generate a docstring for a function define using meta-defun."
+  (->>
+   (concat "[Meta function.]\n"
+	   (when default-docstring default-docstring)
+	   "\n"
+	   "By default, run `"
+	   (format "%s" (cadr (alist-get (make-symbol (concat (symbol-name name) "%t")) conditions nil nil (lambda (a b) (string= (symbol-name a) (symbol-name b))))))
+	   "'\n"
+	   (mapconcat (lambda (condition)
+			(let* ((rcondition (seq-reverse (cdr condition)))
+			       (body (car rcondition))
+                               (subconditions (seq-reverse (cdr rcondition))))
+                          (unless (equal subconditions '(#'t))
+			    (concat "When "
+				    (mapconcat (lambda (el)
+						 (pcase el
+						   ('#'t nil)
+						   (`(function ,_)
+						    (concat "`" (format "%s" el) "' returns 't"))
+						   (_
+						    (concat "major mode is `" (format "%s" (eval el)) "'"))))
+					       subconditions
+					       " and ")
+				    ", run `"
+				    (format "%s" body)
+				    "'"))))
+		      conditions
+		      "\n"))
+   (replace-regexp-in-string "#'" "")))
+
+(cl-defmacro meta-defun (name &rest args)
+  "Define a meta-function or update its definition.
+
+USAGE:
+(meta-defun foo [(arglist)]
+[:override-nil]
+[docstring]
+[:mode bar-mode body-sexp]
+[:mode ...]
+[:cond [:symbol zen-func-symbol] zen-func body-sexp]
+[:cond ...]
+[default-body])
+
+If a command foo has not yet been defined using meta-defun, the above
+defines a command foo, which can call different BODY (which can be a
+function or sexp) depending on major mode or :cond functions. For any
+major mode, the BODY defined in the corresponding [:mode mode body]
+definition is called. If none of the define mode conditions are
+satisfied, the FUNCs in [:cond func body] are called sequentially
+without argument until one of the return 't. Then, the corresponding
+BODY is called. If none of the above conditions can be met,
+DEFAULT-BODY is called.
+
+If a command foo has been already defined with meta-defun, the
+existing definition will be updated. All the omitted definitions will
+be preserved (including docstring and default-body) unless
+:override-nil keyword is provided. If :override-nil keyword is
+present, the command foo will be redefined.
+
+In addition, every BODY definition in :mode definition is bound to foo%bar-mode symbol.
+This symbol can be used in the following [:mode ...] and [:cond ...] definitions.
+In the [:cond ...] definition, it [:symbol zen-fun-symbol] is present, the BODY
+is bound to foo%zen-fun-symbol.
+Otherwise, it is bound to foo%zen-fun is zen a symbol.
+
+\(fn NAME [(ARGLIST)] [DOCSTRING] ARGS...)"
+  (declare (indent defun))
+  `(pcase-let ((`(,arglist ,default-docstring ,conditions) (meta-functions--process-args ',name ',args))
+	       (old-conditions (function-get ',name 'meta-functions-cond-plist))
+               (old-default-docstring (function-get ',name 'meta-functions-default-docstring)))
+     (unless (memq :override-nil ',args)
+       (mapc (lambda (el)
+	       (setf (alist-get (car el) old-conditions nil nil (lambda (a b) (string= (symbol-name a) (symbol-name b)))) (cdr el)))
+	     (reverse conditions))
+       (setq conditions old-conditions)
+       (unless default-docstring (setq default-docstring old-default-docstring)))
+     (mapc (lambda (el)
+	     (let ((main-name  ',name)
+		   (sub-name (car el))
+		   (body (car (reverse el))))
+	       (when sub-name
+		 (eval `(defun ,sub-name ()
+			  (concat "Sub-definition in meta-function `" (symbol-name ',main-name) "'.")
+			  ,body)))))
+	   conditions) ; define the sub-bodies
+     (let ((docstring (meta-functions--generate-docstring ',name default-docstring conditions)))
+       (eval `(defun ,',name ,arglist
+		,docstring
+                (interactive)
+		(seq-some (lambda (condition)
+			    (let* ((rcondition (seq-reverse (cdr condition)))
+				   (body (car rcondition))
+                                   (subconditions (seq-reverse (cdr rcondition))))
+                              (when (seq-reduce (lambda (prev el)
+						  (and prev
+                                                       (pcase el
+							 ('#'t t)
+							 (`(function ,_) (eval `(funcall-interactively ,el)))
+							 (_ (eq major-mode (eval el))))))
+						subconditions
+						t)
+				(eval `(call-interactively ,body))
+                                t)))
+			  ',conditions)))) ; define meta-function
+     (function-put ',name 'meta-functions-cond-plist conditions)
+     (function-put ',name 'meta-functions-default-docstring default-docstring)))
+
+(defun meta-defun-mapc (list)
+  "Defun multiple meta-functions with `meta-defun' trating each element of LIST as argument."
+  (mapc (lambda (body) (eval `(meta-defun ,@body))) list))
 
 (provide 'meta-functions)
 
-  ;;; meta-functions.el ends here
+;;; meta-functions.el ends here
+;; END:1 ends here

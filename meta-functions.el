@@ -1,4 +1,4 @@
-;; [[file:~/Git/emacs-config/config.org::*END][END:1]]
+;; [[id:0fe0bca3-fb51-4e0c-8b35-79a5e92975d6][Modal setup:2]]
 ;;; meta-functions.el --- Define meta-functions to act differently depending on major mode -*- lexical-binding: t; -*-
 
 ;; Version: 2.0
@@ -27,6 +27,11 @@
 ;; (meta-defun meta-next-element "Go to next element." next-line)
 ;; (meta-defun meta-next-element :mode org-agenda-mode (org-agenda-next-item 1))
 ;; (meta-defun meta-next-element :mode org-mode :cond org-at-heading-p (org-next-visible-heading 1))
+;;
+;; Similar packages:
+;; https://gitlab.com/jjzmajic/handle implements similar functionality to unify functions across major modes
+;; However, handle is very major-mode centric. meta-functions is more function-centric
+;; Also, meta-functions is not only limited to current major mode defining which function to call.
 
 ;;; Code:
 (require 'seq)
@@ -217,4 +222,4 @@ Otherwise, it is bound to foo%zen-fun is zen a symbol.
 (provide 'meta-functions)
 
 ;;; meta-functions.el ends here
-;; END:1 ends here
+;; Modal setup:2 ends here

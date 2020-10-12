@@ -215,8 +215,7 @@ The return value is a list (arglist docstring ((sub-body-symbol condition-func|m
 				t)))
 			  ',conditions)))) ; define meta-function
      (function-put ',name 'meta-functions-cond-plist conditions)
-     (function-put ',name 'meta-functions-default-docstring default-docstring)
-     (byte-compile ',name)))
+     (function-put ',name 'meta-functions-default-docstring default-docstring)))
 
 (defun meta-defun-mapc (list)
   "Defun multiple meta-functions with `meta-defun' trating each element of LIST as argument."

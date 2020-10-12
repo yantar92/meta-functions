@@ -1,4 +1,4 @@
-;; [[id:0fe0bca3-fb51-4e0c-8b35-79a5e92975d6][Modal setup:2]]
+;; [[file:~/Git/emacs-config/config.org][END:2]]
 ;;; meta-functions.el --- Define meta-functions to act differently depending on major mode -*- lexical-binding: t; -*-
 
 ;; Version: 2.0
@@ -46,13 +46,13 @@
      (cons
       (list (make-symbol (concat "%" (symbol-name s)))
 	    `(quote ,s)
-            2)
+	    2)
       (meta-functions--process-args-1 (cddr args) 'recursive)))
     (`(:cond :symbol ,(and (pred symbolp) s) ,(and (pred #'functionp) func) . ,_)
      (cons
       (list (make-symbol (concat "%" (symbol-name s)))
 	    `(function ,func)
-            4)
+	    4)
       (meta-functions--process-args-1 (cddddr args) 'recursive)))
     (`(:cond :symbol . ,_)
      (error ":cond :symbol must be followed by symbol and function."))
@@ -60,7 +60,7 @@
      (cons
       (list (when (symbolp func) (make-symbol (concat "%" (symbol-name func))))
 	    `(function ,func)
-            2)
+	    2)
       (meta-functions--process-args-1 (cddr args) 'recursive)))
     (`(:cond ,form . ,_)
      (cons
@@ -72,8 +72,8 @@
      (unless recursive
        (list (list
 	      '%t
-              `(function t)
-              0))))))
+	      `(function t)
+	      0))))))
 
 (defun meta-functions--process-args (name args)
   "Process arguments of `meta-defun'.
@@ -121,8 +121,8 @@ The return value is a list (arglist docstring ((sub-body-symbol condition-func|m
 	   (mapconcat (lambda (condition)
 			(let* ((rcondition (seq-reverse (cdr condition)))
 			       (body (car rcondition))
-                               (subconditions (seq-reverse (cdr rcondition))))
-                          (unless (equal subconditions '(#'t))
+			       (subconditions (seq-reverse (cdr rcondition))))
+			  (unless (equal subconditions '(#'t))
 			    (concat "When "
 				    (mapconcat (lambda (el)
 						 (pcase el
@@ -143,43 +143,43 @@ The return value is a list (arglist docstring ((sub-body-symbol condition-func|m
 (cl-defmacro meta-defun (name &rest args)
   "Define a meta-function or update its definition.
 
-USAGE:
-(meta-defun foo [(arglist)]
-[:override-nil]
-[docstring]
-[:mode bar-mode body-sexp]
-[:mode ...]
-[:cond [:symbol zen-func-symbol] zen-func body-sexp]
-[:cond ...]
-[default-body])
+  USAGE:
+  (meta-defun foo [(arglist)]
+  [:override-nil]
+  [docstring]
+  [:mode bar-mode body-sexp]
+  [:mode ...]
+  [:cond [:symbol zen-func-symbol] zen-func body-sexp]
+  [:cond ...]
+  [default-body])
 
-If a command foo has not yet been defined using meta-defun, the above
-defines a command foo, which can call different BODY (which can be a
-function or sexp) depending on major mode or :cond functions. For any
-major mode, the BODY defined in the corresponding [:mode mode body]
-definition is called. If none of the define mode conditions are
-satisfied, the FUNCs in [:cond func body] are called sequentially
-without argument until one of the return 't. Then, the corresponding
-BODY is called. If none of the above conditions can be met,
-DEFAULT-BODY is called.
+  If a command foo has not yet been defined using meta-defun, the above
+  defines a command foo, which can call different BODY (which can be a
+  function or sexp) depending on major mode or :cond functions. For any
+  major mode, the BODY defined in the corresponding [:mode mode body]
+  definition is called. If none of the define mode conditions are
+  satisfied, the FUNCs in [:cond func body] are called sequentially
+  without argument until one of the return 't. Then, the corresponding
+  BODY is called. If none of the above conditions can be met,
+  DEFAULT-BODY is called.
 
-If a command foo has been already defined with meta-defun, the
-existing definition will be updated. All the omitted definitions will
-be preserved (including docstring and default-body) unless
-:override-nil keyword is provided. If :override-nil keyword is
-present, the command foo will be redefined.
+  If a command foo has been already defined with meta-defun, the
+  existing definition will be updated. All the omitted definitions will
+  be preserved (including docstring and default-body) unless
+  :override-nil keyword is provided. If :override-nil keyword is
+  present, the command foo will be redefined.
 
-In addition, every BODY definition in :mode definition is bound to foo%bar-mode symbol.
-This symbol can be used in the following [:mode ...] and [:cond ...] definitions.
-In the [:cond ...] definition, it [:symbol zen-fun-symbol] is present, the BODY
-is bound to foo%zen-fun-symbol.
-Otherwise, it is bound to foo%zen-fun is zen a symbol.
+  In addition, every BODY definition in :mode definition is bound to foo%bar-mode symbol.
+  This symbol can be used in the following [:mode ...] and [:cond ...] definitions.
+  In the [:cond ...] definition, it [:symbol zen-fun-symbol] is present, the BODY
+  is bound to foo%zen-fun-symbol.
+  Otherwise, it is bound to foo%zen-fun is zen a symbol.
 
-\(fn NAME [(ARGLIST)] [DOCSTRING] ARGS...)"
+  \(fn NAME [(ARGLIST)] [DOCSTRING] ARGS...)"
   (declare (indent defun))
   `(pcase-let ((`(,arglist ,default-docstring ,conditions) (meta-functions--process-args ',name ',args))
 	       (old-conditions (function-get ',name 'meta-functions-cond-plist))
-               (old-default-docstring (function-get ',name 'meta-functions-default-docstring)))
+	       (old-default-docstring (function-get ',name 'meta-functions-default-docstring)))
      (unless (memq :override-nil ',args)
        (mapc (lambda (el)
 	       (setf (alist-get (car el) old-conditions nil nil (lambda (a b) (string= (symbol-name a) (symbol-name b)))) (cdr el)))
@@ -198,21 +198,21 @@ Otherwise, it is bound to foo%zen-fun is zen a symbol.
      (let ((docstring (meta-functions--generate-docstring ',name default-docstring conditions)))
        (eval `(defun ,',name ,arglist
 		,docstring
-                (interactive)
+		(interactive)
 		(seq-some (lambda (condition)
 			    (let* ((rcondition (seq-reverse (cdr condition)))
 				   (body (car rcondition))
-                                   (subconditions (seq-reverse (cdr rcondition))))
-                              (when (seq-reduce (lambda (prev el)
+				   (subconditions (seq-reverse (cdr rcondition))))
+			      (when (seq-reduce (lambda (prev el)
 						  (and prev
-                                                       (pcase el
+						       (pcase el
 							 ('#'t t)
 							 (`(function ,_) (eval `(funcall-interactively ,el)))
 							 (_ (eq major-mode (eval el))))))
 						subconditions
 						t)
 				(eval `(call-interactively ,body))
-                                t)))
+				t)))
 			  ',conditions)))) ; define meta-function
      (function-put ',name 'meta-functions-cond-plist conditions)
      (function-put ',name 'meta-functions-default-docstring default-docstring)
@@ -225,4 +225,4 @@ Otherwise, it is bound to foo%zen-fun is zen a symbol.
 (provide 'meta-functions)
 
 ;;; meta-functions.el ends here
-;; Modal setup:2 ends here
+;; END:2 ends here

@@ -36,6 +36,8 @@
 ;;; Code:
 (require 'seq)
 (require 'dash)
+(require 'org-id)
+
 
 (defun meta-functions--process-args-1 (args &optional recursive)
   "Return list of ((sub-body-symbol condition-func|mode-symbol number-elements-in-args) ...) in front of ARGS."

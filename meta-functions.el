@@ -4,6 +4,7 @@
 ;; Version: 2.0
 ;; Author: Ihor Radchenko <yantar92@gmail.com>
 ;; Created: 10 March 2018
+;; Package-Requires: ((dash "2.0"))
 
 ;;; Commentary:
 

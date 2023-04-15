@@ -41,7 +41,9 @@
 
 
 (defun meta-functions--process-args-1 (args &optional recursive)
-  "Return list of ((sub-body-symbol condition-func|mode-symbol number-elements-in-args) ...) in front of ARGS."
+  "Return normalized arglist.
+Add ((sub-body-symbol condition-func|mode-symbol
+number-elements-in-args) ...) in front of ARGS."
   (pcase args
     (`(:mode ,(and (pred symbolp) s) . ,_)
      (cons
@@ -78,7 +80,8 @@
 
 (defun meta-functions--process-args (name args)
   "Process arguments of `meta-defun'.
-The return value is a list (arglist docstring ((sub-body-symbol condition-func|mode-symbol body) ...))."
+The return value is a list (arglist docstring ((sub-body-symbol
+condition-func|mode-symbol body) ...))."
   (when (memq ':override-nil args) (setq args (delq ':override-nil args)))
   (let* ((arglist (and (listp (car args)) (pop args)))
 	 (docstring (and (stringp (car args)) (pop args)))
@@ -142,7 +145,7 @@ The return value is a list (arglist docstring ((sub-body-symbol condition-func|m
    (replace-regexp-in-string "#'" "")))
 
 (cl-defmacro meta-defun (name &rest args)
-  "Define a meta-function or update its definition.
+  "Define a meta-function NAME or update its definition.
 
   USAGE:
   (meta-defun foo [(arglist)]
@@ -154,27 +157,28 @@ The return value is a list (arglist docstring ((sub-body-symbol condition-func|m
   [:cond ...]
   [default-body])
 
-  If a command foo has not yet been defined using meta-defun, the above
-  defines a command foo, which can call different BODY (which can be a
-  function or sexp) depending on major mode or :cond functions. For any
-  major mode, the BODY defined in the corresponding [:mode mode body]
-  definition is called. If none of the define mode conditions are
-  satisfied, the FUNCs in [:cond func body] are called sequentially
-  without argument until one of the return 't. Then, the corresponding
-  BODY is called. If none of the above conditions can be met,
-  DEFAULT-BODY is called.
+  If a command foo has not yet been defined using meta-defun, the
+  above defines a command foo, which can call different BODY (which
+  can be a function or sexp) depending on major mode or :cond
+  functions. For any major mode, the BODY defined in the corresponding
+  [:mode mode body] definition is called. If none of the define mode
+  conditions are satisfied, the FUNCs in [:cond func body] are called
+  sequentially without argument until one of the return 't. Then, the
+  corresponding BODY is called. If none of the above conditions can be
+  met, DEFAULT-BODY is called.
 
   If a command foo has been already defined with meta-defun, the
-  existing definition will be updated. All the omitted definitions will
-  be preserved (including docstring and default-body) unless
+  existing definition will be updated. All the omitted definitions
+  will be preserved (including docstring and default-body) unless
   :override-nil keyword is provided. If :override-nil keyword is
   present, the command foo will be redefined.
 
-  In addition, every BODY definition in :mode definition is bound to foo%bar-mode symbol.
-  This symbol can be used in the following [:mode ...] and [:cond ...] definitions.
-  In the [:cond ...] definition, it [:symbol zen-fun-symbol] is present, the BODY
-  is bound to foo%zen-fun-symbol.
-  Otherwise, it is bound to foo%zen-fun is zen a symbol.
+  In addition, every BODY definition in :mode definition is bound to
+  foo%bar-mode symbol. This symbol can be used in the following [:mode
+  ...] and [:cond ...] definitions. In the [:cond ...] definition, it
+  [:symbol zen-fun-symbol] is present, the BODY is bound to
+  foo%zen-fun-symbol. Otherwise, it is bound to foo%zen-fun is zen a
+  symbol.
 
   \(fn NAME [(ARGLIST)] [DOCSTRING] ARGS...)"
   (declare (indent defun))
@@ -219,7 +223,8 @@ The return value is a list (arglist docstring ((sub-body-symbol condition-func|m
      (function-put ',name 'meta-functions-default-docstring default-docstring)))
 
 (defun meta-defun-mapc (list)
-  "Defun multiple meta-functions with `meta-defun' trating each element of LIST as argument."
+  "Defun multiple meta-functions with `meta-defun'.
+Trat each element of LIST as argument."
   (mapc (lambda (body) (eval `(meta-defun ,@body))) list))
 
 (provide 'meta-functions)
